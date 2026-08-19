@@ -1,0 +1,2 @@
+eligible_folds,instances,flags,flag_errors,nonflag_instances,nonflag_errors,flag_error_pct,nonflag_error_pct,pooled_odds_ratio,fisher_two_sided_p,mantel_haenszel_common_or,cmh_chi_square,cmh_p
+130,22092,154,77,21938,2270,50.00,10.35,8.66,1.28e-34,2.46,30.24,3.83e-8

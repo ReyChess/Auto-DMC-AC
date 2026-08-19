@@ -1,0 +1,5 @@
+predictor,accuracy_pct,macro_f1,delta_accuracy_pp,full_wins,ties,full_losses,holm_p_accuracy,holm_p_macro_f1
+Full Auto-DMC-AC,81.81,0.7148,,,,,,
+Exact only,80.22,0.6814,-1.58,6,6,3,0.1717,0.1514
+No shrinkage (beta=0),80.83,0.7091,-0.97,9,3,3,0.1025,0.3459
+K=1,81.70,0.7108,-0.11,6,4,5,0.7221,0.3739

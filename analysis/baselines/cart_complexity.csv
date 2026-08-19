@@ -1,0 +1,16 @@
+dataset,tree_depth,tree_leaves,tree_nodes
+Anneal,10.0,19.9,38.8
+Breast,5.3,17.0,33.0
+Flare,12.5,122.3,243.6
+Glass,7.5,35.5,70.0
+Heart,10.7,90.5,180.0
+Hepatitis,5.2,13.2,25.4
+HorseColic,3.4,9.5,18.0
+Ionosphere,4.2,9.6,18.2
+Iris,3.4,5.5,10.0
+Led7,7.0,56.1,111.2
+LetRecog,29.9,3729.6,7458.2
+Mushroom,7.9,10.9,20.8
+PageBlocks,5.1,15.2,29.4
+PenDigits,19.4,533.5,1066.0
+Pima,4.7,16.9,32.8

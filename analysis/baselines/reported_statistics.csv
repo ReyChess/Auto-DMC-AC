@@ -1,0 +1,11 @@
+metric,model,mean,average_rank,auto_wins,ties,auto_losses,holm_p,friedman_chi_square,friedman_p
+accuracy,Auto-DMC-AC,0.8181,3.667,,,,,11.61,0.0205
+accuracy,CART,0.8340,3.100,5,0,10,0.6605,11.61,0.0205
+accuracy,Logistic,0.8408,2.633,5,0,10,0.2190,11.61,0.0205
+accuracy,BernoulliNB,0.8140,3.567,8,0,7,1.0000,11.61,0.0205
+accuracy,RandomForest,0.8556,2.033,2,0,13,0.0134,11.61,0.0205
+macro_f1,Auto-DMC-AC,0.7148,3.333,,,,,5.09,0.2781
+macro_f1,CART,0.7233,2.967,6,0,9,1.0000,5.09,0.2781
+macro_f1,Logistic,0.7253,3.233,7,0,8,1.0000,5.09,0.2781
+macro_f1,BernoulliNB,0.7141,3.233,8,0,7,1.0000,5.09,0.2781
+macro_f1,RandomForest,0.7416,2.233,4,0,11,0.2214,5.09,0.2781

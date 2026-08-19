@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software or its experimental materials, please cite the associated article."
+title: "Auto-DMC-AC: reviewer reproducibility release"
+type: software
+version: 5.4.2
+date-released: 2026-08-09
+url: "https://github.com/ReyChess/Auto-DMC-AC"
+authors:
+  - family-names: "Cruz de la Osa"
+    given-names: "Reyder"
+  - family-names: "Hernandez-Leon"
+    given-names: "Raudel"
+  - family-names: "Moraru"
+    given-names: "Sorin-Aurel"
