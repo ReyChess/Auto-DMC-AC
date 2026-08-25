@@ -1,4 +1,10 @@
-# Auto-DMC-AC v5 — selector automático con control de expansión PN
+# Auto-DMC-AC v5.5.1 — selector automático y salidas interpretables
+
+La versión 5.5.0 conserva sin cambios la lógica predictiva de v5.4.2 y añade
+una salida explicativa verificable. Cada evaluación externa genera, por defecto,
+el modelo global de CARs, las reglas cubrientes y retenidas por instancia, la
+descomposición completa de los scores y una reconstrucción independiente de la
+clase predicha. Consulte `../docs/INTERPRETABILITY_OUTPUTS.md`.
 
 Este proyecto evalúa las variantes:
 
@@ -67,6 +73,7 @@ cd "/cygdrive/e/AutoDMCACFinal/Auto_DMC_AC_CPP_final_optimized_cygwin_v5/auto_fi
   --outer-folds 10 \
   --analysis-scope final \
   --instance-log-scope final \
+  --explanation-scope final \
   --pn-policy auto \
   --pn-max-classes 20 \
   --pn-memory-budget-mb 128 \
@@ -85,6 +92,16 @@ Con 26 clases, LetRecog omite PN en modo `auto` por el límite predeterminado de
 - `selection_log.csv`: ranking de las variantes realmente evaluadas.
 - `dataset_summary.csv`: resultados externos por fold.
 - `auto_dmc_report.txt`: resumen general.
+- `outer_N/final/explanations/global_rule_model.csv`: todas las CARs persistentes del modelo final.
+- `outer_N/final/explanations/prediction_summary.csv`: resumen de cada predicción de test, incluidos los ítems/atributos de entrada.
+- `outer_N/final/explanations/prediction_class_scores.csv`: score bruto, shrinkage, prior y score final por clase.
+- `outer_N/final/explanations/prediction_rule_trace.csv`: reglas cubrientes y reglas Top-K realmente retenidas.
+- `outer_N/final/explanations/prediction_used_cars.csv`: solo las CARs realmente utilizadas, con antecedente, consecuente, Netconf, cobertura, ranking, scores y eventos negativos/veto.
+- `outer_N/final/explanations/prediction_explanations.txt`: explicación legible por instancia.
+- `outer_N/final/explanations/trace_verification.csv`: reconstrucción exacta de las etiquetas reportadas.
+
+La opción `--explanation-scope none` desactiva únicamente la persistencia de
+estas salidas; no cambia la selección ni la predicción.
 
 ## Otras mejoras
 

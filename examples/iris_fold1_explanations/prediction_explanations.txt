@@ -1,0 +1,169 @@
+INSTANCE 1
+  Input items/attributes: {2, 6, 12, 15}
+  True class: 18
+  Predicted class: 18
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 18: raw=0.787383, shrinkage=0.785114, prior=-0.164792, final=0.620322, retained=2/2
+      Rule R2 [rank 1]: {2, 12, 15} => 18; Netconf=0.79646; weight=1
+      Rule R3 [rank 2]: {6, 12, 15} => 18; Netconf=0.76923; weight=0.5
+  Negative conflict: NO
+
+INSTANCE 2
+  Input items/attributes: {2, 8, 12, 15}
+  True class: 18
+  Predicted class: 18
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 18: raw=0.79646, shrinkage=0.79646, prior=-0.164792, final=0.631668, retained=1/1
+      Rule R2 [rank 1]: {2, 12, 15} => 18; Netconf=0.79646; weight=1
+  Negative conflict: NO
+
+INSTANCE 3
+  Input items/attributes: {2, 7, 12, 15}
+  True class: 18
+  Predicted class: 18
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 18: raw=0.79646, shrinkage=0.79646, prior=-0.164792, final=0.631668, retained=1/1
+      Rule R2 [rank 1]: {2, 12, 15} => 18; Netconf=0.79646; weight=1
+  Negative conflict: NO
+
+INSTANCE 4
+  Input items/attributes: {2, 9, 12, 15}
+  True class: 18
+  Predicted class: 18
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 18: raw=0.79646, shrinkage=0.79646, prior=-0.164792, final=0.631668, retained=1/1
+      Rule R2 [rank 1]: {2, 12, 15} => 18; Netconf=0.79646; weight=1
+  Negative conflict: NO
+
+INSTANCE 5
+  Input items/attributes: {5, 9, 13, 16}
+  True class: 18
+  Predicted class: 19
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 19: raw=0.76923, shrinkage=0.76923, prior=-0.164792, final=0.604438, retained=1/1
+      Rule R4 [rank 1]: {5, 16, 13} => 19; Netconf=0.76923; weight=1
+  Negative conflict: NO
+
+INSTANCE 6
+  Input items/attributes: {1, 10, 11, 14}
+  True class: 17
+  Predicted class: 17
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 17: raw=0.87379, shrinkage=0.87379, prior=-0.164792, final=0.708998, retained=1/1
+      Rule R1 [rank 1]: {11, 14, 1, 10} => 17; Netconf=0.87379; weight=1
+  Negative conflict: NO
+
+INSTANCE 7
+  Input items/attributes: {1, 10, 11, 14}
+  True class: 17
+  Predicted class: 17
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 17: raw=0.87379, shrinkage=0.87379, prior=-0.164792, final=0.708998, retained=1/1
+      Rule R1 [rank 1]: {11, 14, 1, 10} => 17; Netconf=0.87379; weight=1
+  Negative conflict: NO
+
+INSTANCE 8
+  Input items/attributes: {1, 10, 11, 14}
+  True class: 17
+  Predicted class: 17
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 17: raw=0.87379, shrinkage=0.87379, prior=-0.164792, final=0.708998, retained=1/1
+      Rule R1 [rank 1]: {11, 14, 1, 10} => 17; Netconf=0.87379; weight=1
+  Negative conflict: NO
+
+INSTANCE 9
+  Input items/attributes: {1, 10, 11, 14}
+  True class: 17
+  Predicted class: 17
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 17: raw=0.87379, shrinkage=0.87379, prior=-0.164792, final=0.708998, retained=1/1
+      Rule R1 [rank 1]: {11, 14, 1, 10} => 17; Netconf=0.87379; weight=1
+  Negative conflict: NO
+
+INSTANCE 10
+  Input items/attributes: {1, 10, 11, 14}
+  True class: 17
+  Predicted class: 17
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 17: raw=0.87379, shrinkage=0.87379, prior=-0.164792, final=0.708998, retained=1/1
+      Rule R1 [rank 1]: {11, 14, 1, 10} => 17; Netconf=0.87379; weight=1
+  Negative conflict: NO
+
+INSTANCE 11
+  Input items/attributes: {3, 6, 13, 16}
+  True class: 19
+  Predicted class: 19
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 19: raw=0.75, shrinkage=0.75, prior=-0.164792, final=0.585208, retained=1/1
+      Rule R5 [rank 1]: {3, 16, 13} => 19; Netconf=0.75; weight=1
+  Negative conflict: NO
+
+INSTANCE 12
+  Input items/attributes: {5, 7, 13, 16}
+  True class: 19
+  Predicted class: 19
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 19: raw=0.76923, shrinkage=0.76923, prior=-0.164792, final=0.604438, retained=1/1
+      Rule R4 [rank 1]: {5, 16, 13} => 19; Netconf=0.76923; weight=1
+  Negative conflict: NO
+
+INSTANCE 13
+  Input items/attributes: {2, 6, 13, 15}
+  True class: 19
+  Predicted class: 18
+  Coverage: fallback_one_missing
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 18: raw=0.787383, shrinkage=0.785114, prior=-0.164792, final=0.620322, retained=2/2
+      Rule R2 [rank 1]: {2, 12, 15} => 18; Netconf=0.79646; weight=1; missing={12}
+      Rule R3 [rank 2]: {6, 12, 15} => 18; Netconf=0.76923; weight=0.5; missing={12}
+  Negative conflict: NO
+
+INSTANCE 14
+  Input items/attributes: {5, 7, 13, 16}
+  True class: 19
+  Predicted class: 19
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 19: raw=0.76923, shrinkage=0.76923, prior=-0.164792, final=0.604438, retained=1/1
+      Rule R4 [rank 1]: {5, 16, 13} => 19; Netconf=0.76923; weight=1
+  Negative conflict: NO
+
+INSTANCE 15
+  Input items/attributes: {5, 9, 13, 16}
+  True class: 19
+  Predicted class: 19
+  Coverage: exact
+  Decision trace verified: YES
+  Candidate class scores:
+    Class 19: raw=0.76923, shrinkage=0.76923, prior=-0.164792, final=0.604438, retained=1/1
+      Rule R4 [rank 1]: {5, 16, 13} => 19; Netconf=0.76923; weight=1
+  Negative conflict: NO
+
+TRACE VERIFICATION SUMMARY
+  Verified predictions: 15/15

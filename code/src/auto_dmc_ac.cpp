@@ -36,6 +36,7 @@ static constexpr double NUM_EPS = 1e-12;
 static constexpr double NEG_INF = -1e300;
 
 struct Rule {
+    int rule_id{};
     std::vector<int> antecedent;
     int class_label{};
     bool negated{};
@@ -52,13 +53,31 @@ struct RuleStatistics {
 };
 
 struct CoveredRuleLog {
+    int rule_id{};
     std::vector<int> antecedent;
+    std::vector<int> missing_items;
+    double support_antecedent{};
+    double support_class{};
+    double support_rule{};
     double netconf{};
+    int evidence_rank{};
+    int retained{};
+    double rank_weight{};
+    double weighted_contribution{};
+    std::string coverage_mode;
 };
 
 struct ClassEvidenceLog {
     int class_label{};
+    int covered_positive_rules{};
+    int retained_positive_rules{};
+    double raw_positive_score{NEG_INF};
     double positive_score{NEG_INF};
+    double class_prior{};
+    double prior_contribution{};
+    double final_score{NEG_INF};
+    int positive_candidate{};
+    int near_tie_candidate{};
     double negative_score{};
     std::vector<CoveredRuleLog> positive_rules;
     std::vector<CoveredRuleLog> negative_rules;
@@ -254,6 +273,7 @@ static RulesByClass parse_rules(const fs::path& path, RuleStatistics* stats = nu
         std::vector<int> items(static_cast<size_t>(n_items));
         for (int& item : items) if (!(iss >> item)) throw std::runtime_error("Incomplete rule items at line " + std::to_string(line_no));
         Rule r;
+        r.rule_id = line_no;
         int raw_class = items.back();
         r.class_label = std::abs(raw_class);
         r.negated = raw_class < 0;
@@ -336,6 +356,110 @@ static bool one_missing_cover(const Rule& r, const std::set<int>& instance) {
     return missing == 1;
 }
 
+static std::vector<int> missing_items(const Rule& r, const std::set<int>& instance) {
+    std::vector<int> out;
+    for (int item : r.antecedent) if (!instance.count(item)) out.push_back(item);
+    return out;
+}
+
+static double raw_positive_score(const std::vector<const Rule*>& rules) {
+    if (rules.empty()) return NEG_INF;
+    const int used = std::min<int>(static_cast<int>(rules.size()), STABLE_K_MAX);
+    double numerator = 0.0, denominator = 0.0;
+    for (int j = 0; j < used; ++j) {
+        const double weight = 1.0 / (j + 1.0);
+        numerator += weight * rules[static_cast<size_t>(j)]->netconf;
+        denominator += weight;
+    }
+    return denominator > 0.0 ? numerator / denominator : 0.0;
+}
+
+static std::vector<ClassEvidenceLog> build_class_evidence(
+        const std::vector<int>& labels,
+        const std::map<int,std::vector<const Rule*>>& pos,
+        const std::map<int,std::vector<const Rule*>>& neg,
+        const std::map<int,double>& score,
+        const std::map<int,double>& negative_scores,
+        const std::map<int,double>& prior,
+        double lambda_prior,
+        bool partial_used,
+        const std::set<int>& instance,
+        const std::vector<int>& tied) {
+    std::set<int> tied_set(tied.begin(), tied.end());
+    std::vector<ClassEvidenceLog> evidence;
+    for (int c : labels) {
+        ClassEvidenceLog ce;
+        ce.class_label = c;
+        auto prior_it = prior.find(c);
+        if (prior_it != prior.end()) ce.class_prior = prior_it->second;
+
+        auto pit = pos.find(c);
+        if (pit != pos.end()) {
+            ce.covered_positive_rules = static_cast<int>(pit->second.size());
+            ce.retained_positive_rules = std::min<int>(ce.covered_positive_rules, STABLE_K_MAX);
+            ce.raw_positive_score = raw_positive_score(pit->second);
+            for (size_t i = 0; i < pit->second.size(); ++i) {
+                const Rule* r = pit->second[i];
+                CoveredRuleLog cr;
+                cr.rule_id = r->rule_id;
+                cr.antecedent = r->antecedent;
+                cr.missing_items = missing_items(*r, instance);
+                cr.support_antecedent = r->support_antecedent;
+                cr.support_class = r->support_class;
+                cr.support_rule = r->support_rule;
+                cr.netconf = r->netconf;
+                cr.evidence_rank = static_cast<int>(i + 1);
+                cr.retained = i < static_cast<size_t>(STABLE_K_MAX) ? 1 : 0;
+                cr.rank_weight = cr.retained ? 1.0 / static_cast<double>(i + 1) : 0.0;
+                cr.weighted_contribution = cr.rank_weight * cr.netconf;
+                cr.coverage_mode = partial_used ? "fallback_one_missing" : "exact";
+                ce.positive_rules.push_back(std::move(cr));
+            }
+        }
+
+        auto sit = score.find(c);
+        if (sit != score.end() && sit->second > -1e200) {
+            ce.positive_candidate = 1;
+            ce.positive_score = sit->second;
+            ce.prior_contribution = lambda_prior * std::log(ce.class_prior);
+            ce.final_score = ce.positive_score + ce.prior_contribution;
+        }
+        ce.near_tie_candidate = tied_set.count(c) ? 1 : 0;
+
+        auto nit = negative_scores.find(c);
+        if (nit != negative_scores.end()) ce.negative_score = nit->second;
+        auto nrit = neg.find(c);
+        if (nrit != neg.end()) {
+            std::vector<const Rule*> ordered = nrit->second;
+            std::stable_sort(ordered.begin(), ordered.end(), [](const Rule* a, const Rule* b) {
+                return -a->netconf > -b->netconf;
+            });
+            for (size_t i = 0; i < ordered.size(); ++i) {
+                const Rule* r = ordered[i];
+                CoveredRuleLog cr;
+                cr.rule_id = r->rule_id;
+                cr.antecedent = r->antecedent;
+                cr.support_antecedent = r->support_antecedent;
+                cr.support_class = r->support_class;
+                cr.support_rule = r->support_rule;
+                cr.netconf = r->netconf;
+                cr.evidence_rank = static_cast<int>(i + 1);
+                cr.retained = i < static_cast<size_t>(STABLE_K_NEG_MAX) ? 1 : 0;
+                // Negative aggregation is not additive: neg_score uses the
+                // strongest exact counter-evidence and the retained count.
+                // Keep additive weight/contribution at zero and report the
+                // resulting class-level negative_score separately.
+                cr.rank_weight = 0.0;
+                cr.weighted_contribution = 0.0;
+                cr.coverage_mode = "exact_negative";
+                ce.negative_rules.push_back(std::move(cr));
+            }
+        }
+        evidence.push_back(std::move(ce));
+    }
+    return evidence;
+}
+
 static EvalResult classify(const RulesByClass& rules_by_class,
                            const Dataset& rows,
                            const std::map<int,int>& counts,
@@ -404,6 +528,7 @@ static EvalResult classify(const RulesByClass& rules_by_class,
         std::map<int,double> score;
         std::map<int,std::vector<const Rule*>> neg;
         std::map<int,double> negative_scores;
+        std::vector<int> tied;
         std::vector<double> all_pos;
         for (const auto& [c, v] : pos) { (void)c; for (const Rule* r : v) all_pos.push_back(r->netconf); }
 
@@ -440,7 +565,6 @@ static EvalResult classify(const RulesByClass& rules_by_class,
                 il.default_used = 1;
                 ++out.default_count;
             } else {
-                std::vector<int> tied;
                 for (int c : labels) if (score[c] > -1e200 && best_pos - score[c] <= STABLE_TIE_EPS) tied.push_back(c);
                 il.tie_size = static_cast<int>(tied.size());
                 out.total_tie_classes += il.tie_size;
@@ -526,33 +650,9 @@ static EvalResult classify(const RulesByClass& rules_by_class,
         }
 
         if (collect_rule_evidence) {
-            for (int c : labels) {
-                ClassEvidenceLog ce;
-                ce.class_label = c;
-                auto sit = score.find(c);
-                if (sit != score.end()) ce.positive_score = sit->second;
-                auto nit = negative_scores.find(c);
-                if (nit != negative_scores.end()) ce.negative_score = nit->second;
-                auto pit = pos.find(c);
-                if (pit != pos.end()) {
-                    for (const Rule* r : pit->second) {
-                        CoveredRuleLog cr;
-                        cr.antecedent = r->antecedent;
-                        cr.netconf = r->netconf;
-                        ce.positive_rules.push_back(std::move(cr));
-                    }
-                }
-                auto nrit = neg.find(c);
-                if (nrit != neg.end()) {
-                    for (const Rule* r : nrit->second) {
-                        CoveredRuleLog cr;
-                        cr.antecedent = r->antecedent;
-                        cr.netconf = r->netconf;
-                        ce.negative_rules.push_back(std::move(cr));
-                    }
-                }
-                il.class_evidence.push_back(std::move(ce));
-            }
+            il.class_evidence = build_class_evidence(labels, pos, neg, score,
+                negative_scores, prior, lambda_prior, il.partial_used != 0,
+                instance, tied);
         }
 
         il.predicted_class = prediction;
@@ -791,33 +891,9 @@ static std::map<double, EvalResult> classify_lambda_grid(
             }
 
             if (collect_rule_evidence) {
-                for (int c : labels) {
-                    ClassEvidenceLog ce;
-                    ce.class_label = c;
-                    auto sit = score.find(c);
-                    if (sit != score.end()) ce.positive_score = sit->second;
-                    auto nit = negative_scores.find(c);
-                    if (nit != negative_scores.end()) ce.negative_score = nit->second;
-                    auto pit = pos.find(c);
-                    if (pit != pos.end()) {
-                        for (const Rule* r : pit->second) {
-                            CoveredRuleLog cr;
-                            cr.antecedent = r->antecedent;
-                            cr.netconf = r->netconf;
-                            ce.positive_rules.push_back(std::move(cr));
-                        }
-                    }
-                    auto nrit = neg.find(c);
-                    if (nrit != neg.end()) {
-                        for (const Rule* r : nrit->second) {
-                            CoveredRuleLog cr;
-                            cr.antecedent = r->antecedent;
-                            cr.netconf = r->netconf;
-                            ce.negative_rules.push_back(std::move(cr));
-                        }
-                    }
-                    il.class_evidence.push_back(std::move(ce));
-                }
+                il.class_evidence = build_class_evidence(labels, pos, neg, score,
+                    negative_scores, prior, lambda_prior, partial_used != 0,
+                    instance, tied);
             }
 
             il.predicted_class = prediction;
@@ -1081,6 +1157,189 @@ static void write_analysis_instances(const fs::path& path,
         << "Cambios incorrectos = " << rm.eval.veto_incorrect_change_count << "\n";
 }
 
+static std::string join_items(const std::vector<int>& items, const char* separator = " ") {
+    std::ostringstream out;
+    for (size_t i = 0; i < items.size(); ++i) {
+        if (i) out << separator;
+        out << items[i];
+    }
+    return out.str();
+}
+
+static std::string csv_field(const std::string& value) {
+    std::string escaped;
+    escaped.reserve(value.size() + 2);
+    escaped.push_back('"');
+    for (char ch : value) {
+        if (ch == '"') escaped.push_back('"');
+        escaped.push_back(ch);
+    }
+    escaped.push_back('"');
+    return escaped;
+}
+
+static int default_class_from_counts(const std::map<int,int>& counts) {
+    if (counts.empty()) throw std::runtime_error("Cannot determine a default class from empty counts");
+    int winner = counts.begin()->first;
+    for (const auto& [c, n] : counts) {
+        const int current = counts.at(winner);
+        if (n > current || (n == current && c < winner)) winner = c;
+    }
+    return winner;
+}
+
+static int reconstruct_prediction(const InstanceLog& x, int default_class) {
+    if (x.default_used) return default_class;
+    int winner = -1;
+    double best = NEG_INF;
+    for (const auto& ce : x.class_evidence) {
+        if (!ce.positive_candidate || ce.final_score <= -1e200) continue;
+        if (winner < 0 || ce.final_score > best + NUM_EPS ||
+            (std::fabs(ce.final_score - best) <= NUM_EPS && ce.class_label < winner)) {
+            winner = ce.class_label;
+            best = ce.final_score;
+        }
+    }
+    if (winner < 0) winner = default_class;
+    if (x.veto_changed_prediction && x.alternative_class >= 0) winner = x.alternative_class;
+    return winner;
+}
+
+static void write_global_rule_model(const fs::path& path,
+                                    const RulesByClass& rules_by_class,
+                                    const RunMetrics& rm) {
+    std::ofstream out(path);
+    if (!out) throw std::runtime_error("Cannot create global rule model: " + path.string());
+    out << "outer_fold,variant,sigma,lambda_prior,rule_id,rule_type,class_label,antecedent,antecedent_length,support_antecedent,support_class,support_rule,confidence,netconf\n";
+    out << std::setprecision(12);
+    for (const auto& [c, rules] : rules_by_class) {
+        for (const Rule& r : rules) {
+            const double confidence = r.support_antecedent > 0.0 ? r.support_rule / r.support_antecedent : 0.0;
+            out << rm.outer_fold << ',' << rm.variant.name << ',' << rm.sigma << ',' << rm.lambda_prior << ','
+                << r.rule_id << ',' << (r.negated ? "negative" : "positive") << ',' << c << ','
+                << csv_field(join_items(r.antecedent)) << ',' << r.antecedent.size() << ','
+                << r.support_antecedent << ',' << r.support_class << ',' << r.support_rule << ','
+                << confidence << ',' << r.netconf << '\n';
+        }
+    }
+}
+
+static void write_prediction_explanations(const fs::path& directory,
+                                          const RunMetrics& rm,
+                                          const RulesByClass& rules_by_class,
+                                          const std::map<int,int>& counts) {
+    fs::create_directories(directory);
+    write_global_rule_model(directory / "global_rule_model.csv", rules_by_class, rm);
+
+    std::ofstream summary(directory / "prediction_summary.csv");
+    std::ofstream classes(directory / "prediction_class_scores.csv");
+    std::ofstream rules(directory / "prediction_rule_trace.csv");
+    std::ofstream used_cars(directory / "prediction_used_cars.csv");
+    std::ofstream readable(directory / "prediction_explanations.txt");
+    std::ofstream verification(directory / "trace_verification.csv");
+    if (!summary || !classes || !rules || !used_cars || !readable || !verification)
+        throw std::runtime_error("Cannot create one or more explanation outputs in " + directory.string());
+
+    summary << "outer_fold,instance_id,instance_items,true_class,predicted_class,correct,coverage_mode,default_used,exact_positive_rules,partial_positive_rules,covered_positive_rules,mu0_positive,near_tie,tie_size,negative_evaluated,negative_covered,negative_rules_activated,veto_changed_prediction,reconstructed_prediction,trace_verified\n";
+    classes << "outer_fold,instance_id,class_label,positive_candidate,near_tie_candidate,covered_positive_rules,retained_positive_rules,raw_positive_score,mu0_positive,shrunken_positive_score,class_prior,lambda_prior,prior_contribution,final_score,negative_score,predicted_class\n";
+    rules << "outer_fold,instance_id,evidence_type,class_label,rule_id,coverage_mode,evidence_rank,retained_for_decision,antecedent,missing_items,support_antecedent,support_class,support_rule,netconf,rank_weight,weighted_contribution,predicted_class\n";
+    used_cars << "outer_fold,instance_id,true_class,predicted_class,rule_role,rule_id,antecedent,consequent_class,coverage_mode,retained_rank,support_antecedent,support_class,support_rule,netconf,rank_weight,weighted_contribution,raw_class_score,shrunken_class_score,prior_contribution,final_class_score,negative_class_score,near_tie_candidate,negative_evaluated,negative_covered,veto_condition_met,veto_changed_prediction,base_class,alternative_class\n";
+    verification << "outer_fold,instance_id,reported_prediction,reconstructed_prediction,verified\n";
+    summary << std::setprecision(12);
+    classes << std::setprecision(12);
+    rules << std::setprecision(12);
+    used_cars << std::setprecision(12);
+    verification << std::setprecision(12);
+    readable << std::setprecision(6);
+
+    const int default_class = default_class_from_counts(counts);
+    int verified_count = 0;
+    for (const InstanceLog& x : rm.eval.instances) {
+        const int reconstructed = reconstruct_prediction(x, default_class);
+        const int verified = reconstructed == x.predicted_class ? 1 : 0;
+        verified_count += verified;
+        const std::string coverage_mode = x.default_used ? "default" : (x.partial_used ? "fallback_one_missing" : "exact");
+        summary << rm.outer_fold << ',' << x.instance_id << ',' << csv_field(join_items(x.items)) << ','
+                << x.true_class << ',' << x.predicted_class << ','
+                << x.correct << ',' << coverage_mode << ',' << x.default_used << ',' << x.exact_positive_rules << ','
+                << x.partial_positive_rules << ',' << x.positive_cover_total << ',' << x.mu0_positive << ','
+                << x.near_tie << ',' << x.tie_size << ',' << x.negative_evaluated << ',' << x.negative_covered << ','
+                << x.negative_rules_activated << ',' << x.veto_changed_prediction << ',' << reconstructed << ',' << verified << '\n';
+        verification << rm.outer_fold << ',' << x.instance_id << ',' << x.predicted_class << ',' << reconstructed << ',' << verified << '\n';
+
+        readable << "INSTANCE " << x.instance_id << "\n"
+                 << "  Input items/attributes: {" << join_items(x.items, ", ") << "}\n"
+                 << "  True class: " << x.true_class << "\n"
+                 << "  Predicted class: " << x.predicted_class << "\n"
+                 << "  Coverage: " << coverage_mode << "\n"
+                 << "  Decision trace verified: " << (verified ? "YES" : "NO") << "\n"
+                 << "  Candidate class scores:\n";
+
+        for (const ClassEvidenceLog& ce : x.class_evidence) {
+            classes << rm.outer_fold << ',' << x.instance_id << ',' << ce.class_label << ',' << ce.positive_candidate << ','
+                    << ce.near_tie_candidate << ',' << ce.covered_positive_rules << ',' << ce.retained_positive_rules << ','
+                    << ce.raw_positive_score << ',' << x.mu0_positive << ',' << ce.positive_score << ',' << ce.class_prior << ','
+                    << rm.lambda_prior << ',' << ce.prior_contribution << ',' << ce.final_score << ',' << ce.negative_score << ','
+                    << x.predicted_class << '\n';
+
+            if (ce.positive_candidate) {
+                readable << "    Class " << ce.class_label << ": raw=" << ce.raw_positive_score
+                         << ", shrinkage=" << ce.positive_score << ", prior=" << ce.prior_contribution
+                         << ", final=" << ce.final_score << ", retained=" << ce.retained_positive_rules
+                         << '/' << ce.covered_positive_rules << "\n";
+            }
+
+            for (const CoveredRuleLog& cr : ce.positive_rules) {
+                rules << rm.outer_fold << ',' << x.instance_id << ",positive," << ce.class_label << ',' << cr.rule_id << ','
+                      << cr.coverage_mode << ',' << cr.evidence_rank << ',' << cr.retained << ','
+                      << csv_field(join_items(cr.antecedent)) << ',' << csv_field(join_items(cr.missing_items)) << ','
+                      << cr.support_antecedent << ',' << cr.support_class << ',' << cr.support_rule << ',' << cr.netconf << ','
+                      << cr.rank_weight << ',' << cr.weighted_contribution << ',' << x.predicted_class << '\n';
+                if (cr.retained) {
+                    used_cars << rm.outer_fold << ',' << x.instance_id << ',' << x.true_class << ',' << x.predicted_class
+                              << ",positive_decision," << cr.rule_id << ',' << csv_field(join_items(cr.antecedent)) << ','
+                              << ce.class_label << ',' << cr.coverage_mode << ',' << cr.evidence_rank << ','
+                              << cr.support_antecedent << ',' << cr.support_class << ',' << cr.support_rule << ','
+                              << cr.netconf << ',' << cr.rank_weight << ',' << cr.weighted_contribution << ','
+                              << ce.raw_positive_score << ',' << ce.positive_score << ',' << ce.prior_contribution << ','
+                              << ce.final_score << ',' << ce.negative_score << ',' << ce.near_tie_candidate << ','
+                              << x.negative_evaluated << ',' << x.negative_covered << ',' << x.veto_condition_met << ','
+                              << x.veto_changed_prediction << ',' << x.base_class << ',' << x.alternative_class << '\n';
+                }
+                if (cr.retained && ce.class_label == x.predicted_class) {
+                    readable << "      Rule R" << cr.rule_id << " [rank " << cr.evidence_rank << "]: {"
+                             << join_items(cr.antecedent, ", ") << "} => " << ce.class_label
+                             << "; Netconf=" << cr.netconf << "; weight=" << cr.rank_weight;
+                    if (!cr.missing_items.empty()) readable << "; missing={" << join_items(cr.missing_items, ", ") << '}';
+                    readable << "\n";
+                }
+            }
+            for (const CoveredRuleLog& cr : ce.negative_rules) {
+                rules << rm.outer_fold << ',' << x.instance_id << ",negative," << ce.class_label << ',' << cr.rule_id << ','
+                      << cr.coverage_mode << ',' << cr.evidence_rank << ',' << cr.retained << ','
+                      << csv_field(join_items(cr.antecedent)) << ',' << csv_field("") << ','
+                      << cr.support_antecedent << ',' << cr.support_class << ',' << cr.support_rule << ',' << cr.netconf << ','
+                      << cr.rank_weight << ',' << cr.weighted_contribution << ',' << x.predicted_class << '\n';
+                if (cr.retained) {
+                    used_cars << rm.outer_fold << ',' << x.instance_id << ',' << x.true_class << ',' << x.predicted_class
+                              << ",negative_counter_evidence," << cr.rule_id << ',' << csv_field(join_items(cr.antecedent)) << ','
+                              << ce.class_label << ',' << cr.coverage_mode << ',' << cr.evidence_rank << ','
+                              << cr.support_antecedent << ',' << cr.support_class << ',' << cr.support_rule << ','
+                              << cr.netconf << ',' << cr.rank_weight << ',' << cr.weighted_contribution << ','
+                              << ce.raw_positive_score << ',' << ce.positive_score << ',' << ce.prior_contribution << ','
+                              << ce.final_score << ',' << ce.negative_score << ',' << ce.near_tie_candidate << ','
+                              << x.negative_evaluated << ',' << x.negative_covered << ',' << x.veto_condition_met << ','
+                              << x.veto_changed_prediction << ',' << x.base_class << ',' << x.alternative_class << '\n';
+                }
+            }
+        }
+        readable << "  Negative conflict: " << (x.negative_covered ? "YES" : "NO") << "\n\n";
+    }
+    readable << "TRACE VERIFICATION SUMMARY\n  Verified predictions: " << verified_count << '/' << rm.eval.instances.size() << "\n";
+    if (verified_count != static_cast<int>(rm.eval.instances.size()))
+        throw std::runtime_error("Explanation trace failed to reconstruct one or more predictions");
+}
+
 struct Options {
     fs::path partition_dir;
     fs::path miner;
@@ -1096,6 +1355,7 @@ struct Options {
     int outer_folds = 10;
     std::string analysis_scope = "final";      // none | final | all
     std::string instance_log_scope = "final";  // none | final | all
+    std::string explanation_scope = "final";   // none | final
 
     // Negative-rule computational guard. The decision uses training data only.
     std::string pn_policy = "auto";             // auto | always | never
@@ -1122,6 +1382,7 @@ static void usage(const char* exe) {
               << " [--sigma-mining-time-limit-sec 30] [--min-netconf 0.0]"
               << " [--lambda-grid 0.00,0.05,0.10,0.15,0.20,0.30] [--inner-folds 3] [--seed N] [--outer-folds 10]"
               << " [--analysis-scope none|final|all] [--instance-log-scope none|final|all]"
+              << " [--explanation-scope none|final]"
               << " [--pn-policy auto|always|never] [--pn-max-classes 20]"
               << " [--pn-memory-budget-mb 128] [--pn-bytes-per-rule 256]"
               << " [--pn-estimation-safety 1.25]"
@@ -1186,6 +1447,7 @@ static Options parse_args(int argc, char** argv) {
         else if (a == "--outer-folds") o.outer_folds = std::stoi(need());
         else if (a == "--analysis-scope") o.analysis_scope = need();
         else if (a == "--instance-log-scope") o.instance_log_scope = need();
+        else if (a == "--explanation-scope") o.explanation_scope = need();
         else if (a == "--pn-policy") o.pn_policy = need();
         else if (a == "--pn-max-classes") o.pn_max_classes = std::stoi(need());
         else if (a == "--pn-memory-budget-mb") o.pn_memory_budget_mb = std::stod(need());
@@ -1210,6 +1472,8 @@ static Options parse_args(int argc, char** argv) {
     auto valid_scope = [](const std::string& x) { return x == "none" || x == "final" || x == "all"; };
     if (!valid_scope(o.analysis_scope)) throw std::runtime_error("--analysis-scope must be none, final, or all");
     if (!valid_scope(o.instance_log_scope)) throw std::runtime_error("--instance-log-scope must be none, final, or all");
+    if (!(o.explanation_scope == "none" || o.explanation_scope == "final"))
+        throw std::runtime_error("--explanation-scope must be none or final");
     if (o.min_netconf < 0.0) throw std::runtime_error("--min-netconf must be >= 0.0");
     if (!(o.pn_policy == "auto" || o.pn_policy == "always" || o.pn_policy == "never"))
         throw std::runtime_error("--pn-policy must be auto, always, or never");
@@ -1276,6 +1540,7 @@ int main(int argc, char** argv) {
                 << "seed=" << opt.seed << '\n'
                 << "analysis_scope=" << opt.analysis_scope << '\n'
                 << "instance_log_scope=" << opt.instance_log_scope << '\n'
+                << "explanation_scope=" << opt.explanation_scope << '\n'
                 << "pn_policy=" << opt.pn_policy << '\n'
                 << "pn_max_classes=" << opt.pn_max_classes << '\n'
                 << "pn_memory_budget_mb=" << opt.pn_memory_budget_mb << '\n'
@@ -1544,12 +1809,16 @@ int main(int argc, char** argv) {
                                                 opt.min_netconf, final_dir / "miner.log");
             RulesByClass final_rule_set = parse_rules(final_rules, &final_rm.rule_stats);
             final_rm.eval = classify(final_rule_set, outer_test, class_counts(outer_train), best.lambda_prior,
-                                     opt.analysis_scope == "all" || opt.analysis_scope == "final");
+                                     opt.analysis_scope == "all" || opt.analysis_scope == "final" ||
+                                     opt.explanation_scope == "final");
             write_run_summary(logs.run_summary, final_rm);
             if (opt.instance_log_scope == "all" || opt.instance_log_scope == "final")
                 write_instance_logs(logs.instance, final_rm);
             if (opt.analysis_scope == "all" || opt.analysis_scope == "final")
                 write_analysis_instances(final_dir / "AnalisisInstancias.dat", final_rm, final_train, final_test, final_rules);
+            if (opt.explanation_scope == "final")
+                write_prediction_explanations(final_dir / "explanations", final_rm, final_rule_set,
+                                              class_counts(outer_train));
 
             std::ofstream pred(final_dir / "predictions.csv");
             pred << "instance,true_class,predicted_class,correct,default_used,partial_used,positive_cover_total,near_tie,tie_size,negative_evaluated,negative_covered,negative_rules_activated,veto_changed_prediction\n";
@@ -1624,7 +1893,14 @@ int main(int argc, char** argv) {
                << "  run_configuration.txt: complete reproducibility configuration.\n"
                << "  dataset_summary.csv: one row per outer fold with the selected variant and detailed counts.\n"
                << "  AnalisisInstancias.dat: controlled by --analysis-scope (default: final).\n"
-               << "  instance_log.csv: controlled by --instance-log-scope (default: final).\n";
+               << "  instance_log.csv: controlled by --instance-log-scope (default: final).\n"
+               << "  outer_N/final/explanations/global_rule_model.csv: complete fitted CAR model.\n"
+               << "  outer_N/final/explanations/prediction_summary.csv: one row per outer-test prediction.\n"
+               << "  outer_N/final/explanations/prediction_class_scores.csv: raw, shrunken, prior, and final scores.\n"
+               << "  outer_N/final/explanations/prediction_rule_trace.csv: covered and retained CAR evidence.\n"
+               << "  outer_N/final/explanations/prediction_used_cars.csv: CARs actually used, with scores and veto events.\n"
+               << "  outer_N/final/explanations/prediction_explanations.txt: human-readable prediction explanations.\n"
+               << "  outer_N/final/explanations/trace_verification.csv: independent reconstruction check.\n";
 
         std::cout << "Mean outer accuracy=" << std::fixed << std::setprecision(4) << acc_sum/opt.outer_folds
                   << " mean outer macroF1=" << f1_sum/opt.outer_folds << '\n';
