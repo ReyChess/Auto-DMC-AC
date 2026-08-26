@@ -47,29 +47,21 @@ The historical `code/src/DivideEn10.c` utility is retained for provenance, but t
 
 
 
-\### Python dependencies
+## Python dependencies
 
 
 
 The optional preprocessing toolkit for user-provided tabular datasets requires \*\*Python 3\*\* and the packages listed in \[`requirements.txt`](requirements.txt).
 
-
-
 On Windows:
-
-
 
 ```powershell
 
 py -3 -m pip install -r requirements.txt
 
-```
-
 
 
 On Linux/macOS:
-
-
 
 ```bash
 
@@ -77,15 +69,9 @@ python3 -m pip install -r requirements.txt
 
 ```
 
-
-
 The Python dependencies are required \*\*only for the optional user-data preprocessing utilities\*\*. The core Auto-DMC-AC classifier and mining components remain implemented in compiled C/C++ code and do not require Python for normal execution on already prepared transactional partitions.
 
-
-
 The preprocessing toolkit currently depends on:
-
-
 
 \* `numpy`
 
@@ -111,11 +97,7 @@ py -3 -m pytest tests/user\_data -q
 
 ```
 
-
-
 \*\*Linux/macOS\*\*
-
-
 
 ```bash
 
@@ -123,15 +105,9 @@ python3 -m pytest tests/user\_data -q
 
 ```
 
-
-
 A successful validation should report all user-data preprocessing tests as passed.
 
-
-
 For complete instructions on preparing and running your own datasets, including already-discretized transactional data and raw tabular CSV data, see \[`docs/USING\_YOUR\_OWN\_DATA.md`](docs/USING\_YOUR\_OWN\_DATA.md).
-
-
 
 ## Main benchmark protocol
 
