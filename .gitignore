@@ -1,0 +1,19 @@
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local C/C++ build products
+code/build/
+
+# Local experiment outputs
+*_auto_results/
+*_auto_results.zip
+
+# Local integration/toolkit bundles
+AutoDMCAC_user_data_toolkit_v*/
+AutoDMCAC_user_data_toolkit_v*.zip
+
+# Editor/OS noise
+.DS_Store
+Thumbs.db

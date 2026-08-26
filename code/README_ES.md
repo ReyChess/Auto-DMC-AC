@@ -98,7 +98,7 @@ Con 26 clases, LetRecog omite PN en modo `auto` por el límite predeterminado de
 - `outer_N/final/explanations/prediction_rule_trace.csv`: reglas cubrientes y reglas Top-K realmente retenidas.
 - `outer_N/final/explanations/prediction_used_cars.csv`: solo las CARs realmente utilizadas, con antecedente, consecuente, Netconf, cobertura, ranking, scores y eventos negativos/veto.
 - `outer_N/final/explanations/prediction_explanations.txt`: explicación legible por instancia.
-- `outer_N/final/explanations/trace_verification.csv`: reconstrucción exacta de las etiquetas reportadas.
+- `outer_N/final/explanations/trace_verification.csv`: verificación de que la predicción recomputada desde la traza coincide con la predicción originalmente emitida por Auto-DMC-AC; no es una verificación contra el ground truth.
 
 La opción `--explanation-scope none` desactiva únicamente la persistencia de
 estas salidas; no cambia la selección ni la predicción.
@@ -135,3 +135,46 @@ Lógica:
 4. CNS se omite si el piloto agota el tiempo, falla, o proyecta un coste superior a los presupuestos de tiempo o memoria.
 
 Las decisiones quedan registradas en `cns_guard.csv`. `--cns-policy always` fuerza CNS y `--cns-policy never` lo desactiva.
+
+## Ejecutar Auto-DMC-AC con datos propios
+
+Auto-DMC-AC espera que cada instancia llegue como una transacción de identificadores enteros y que el último identificador de cada fila sea la clase. Para nuevos datasets, la guía completa está en `../docs/USING_YOUR_OWN_DATA.md`.
+
+### Dataset ya discreto/transaccional
+
+La vía reproducible recomendada es:
+
+```powershell
+py -3 ..\tools\prepare_user_dataset.py transactional-cv `
+  --input "..\my_dataset.dat" `
+  --outer-folds 10 `
+  --seed 20260715 `
+  --output-dir "..\MyDatasetPartition"
+```
+
+Esto genera `Dataset1.dat`--`Dataset10.dat`, `1.dat`--`10.dat`, `Classes.dat` y el manifiesto de la partición. `src/DivideEn10.c` se conserva como utilidad histórica, pero para nuevos experimentos se recomienda la vía Python porque la semilla queda explícita.
+
+### Dataset tabular/CSV sin discretizar
+
+El preprocesador admite cuatro métodos numéricos:
+
+- `lucs-kdd-style`: cinco rangos equal-width por defecto, con overrides por atributo; mantiene continuidad conceptual con el preprocesamiento histórico CARM sin afirmar equivalencia exacta con el LUCS-KDD-DN original.
+- `mdlp`: discretización supervisada Fayyad--Irani, adaptativa a la clase.
+- `equal-width`: rangos de igual amplitud.
+- `equal-frequency`: rangos por cuantiles.
+
+Ejemplo con MDLP:
+
+```powershell
+py -3 ..\tools\prepare_user_dataset.py outer-cv `
+  --input "..\mydata.csv" `
+  --class-column class `
+  --numeric-method mdlp `
+  --outer-folds 10 `
+  --seed 20260715 `
+  --output-dir "..\MyDatasetPartition"
+```
+
+Los parámetros de preprocesamiento se ajustan usando solo cada entrenamiento externo y se aplican sin cambios al test externo correspondiente. El resultado se puede pasar directamente a `--partition-dir`. Los metadatos por fold conservan cortes, medianas, mappings e IDs para auditoría y reproducibilidad.
+
+Los 15 datasets históricos incluidos con el benchmark **no deben rediscretizarse** para reproducir el artículo.

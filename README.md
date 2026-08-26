@@ -12,9 +12,14 @@ This archive accompanies the manuscript **“Auto-DMC-AC: An Automatically Confi
 - `analysis/negative_evidence/`: the negative-conflict and directional stress-test summaries, together with the analysis scripts.
 - `LICENSE`: MIT License governing reuse of the software and associated materials.
 - `docs/INTERPRETABILITY_OUTPUTS.md`: specification of the global CAR model and faithful per-prediction explanation outputs.
+- `docs/USING_YOUR_OWN_DATA.md`: end-to-end guide for new transactional or raw tabular datasets.
+- `tools/prepare_user_dataset.py`: reproducible partitioning plus LUCS-KDD-style, MDLP, equal-width, and equal-frequency preprocessing.
 - `tests/test_explanation_trace.py`: independent validator for the exported decision traces.
-- `examples/iris_fold1_explanations/`: a complete verified example containing exact and fallback predictions.
+- `tests/user_data/`: tests for user-data preprocessing and partition generation.
+- `examples/iris_fold1_explanations/`: a complete verified explanation example.
+- `examples/user_dataset/toy_dataset.csv`: minimal raw-tabular example for the preprocessing workflow.
 - `VALIDATION_v5_5_0.md`: build, prediction-invariance, and ten-fold trace-validation evidence.
+- `VALIDATION_USER_DATA.md`: validation of the new user-data workflow.
 
 ## Interpretable prediction outputs
 
@@ -26,6 +31,18 @@ decompositions, the complete coverage trace, a consolidated
 explanation, and an independent reconstruction check. These files are written under
 `outer_N/final/explanations/` when `--explanation-scope final` is active (the
 default). See `docs/INTERPRETABILITY_OUTPUTS.md` for field-level details.
+
+
+## Use Auto-DMC-AC with your own data
+
+Auto-DMC-AC can also be applied to datasets outside the supplied 15-dataset benchmark. The classifier expects integer transactional data with the class item last in each row. The repository provides `tools/prepare_user_dataset.py` for two reproducible entry paths:
+
+- **already discrete / transactional data**: `transactional-cv` creates seeded stratified external partitions;
+- **raw CSV / tabular data**: `outer-cv` creates fold-specific transactional representations using `lucs-kdd-style`, `mdlp`, `equal-width`, or `equal-frequency` numeric preprocessing.
+
+For raw tabular data, preprocessing parameters are fitted on each outer-training fold and then applied unchanged to the held-out outer test. The generated directory can be passed directly to `auto_dmc_ac --partition-dir`. See [`docs/USING_YOUR_OWN_DATA.md`](docs/USING_YOUR_OWN_DATA.md) for the complete workflow, input format, Windows commands, reproducibility metadata, and methodological notes.
+
+The historical `code/src/DivideEn10.c` utility is retained for provenance, but the seeded Python `transactional-cv` route is recommended for new reproducible partitioning.
 
 ## Main benchmark protocol
 
@@ -46,7 +63,7 @@ cd code
 ./build_linux.sh
 ```
 
-The source-level usage and platform-specific build instructions are in `code/README_ES.md` and the build scripts. Python analyses require Python 3 plus `numpy`, `pandas`, `scipy`, and `scikit-learn`.
+The source-level usage and platform-specific build instructions are in `code/README_ES.md` and the build scripts. Python analyses and user-data preparation require Python 3 plus `numpy`, `pandas`, `scipy`, and `scikit-learn` (`pip install -r requirements.txt`). Testing additionally requires `pytest`.
 
 ## Reference results and hardware-sensitive guards
 
